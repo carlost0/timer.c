@@ -1,4 +1,13 @@
 /* cc timer.c -o timer */
+
+/*
+ * usage: timer [options]
+ *  
+ * options: -s <int seconds>
+ *          -m <int minutes>
+ *          -h <int hours>
+*/
+
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,12 +27,6 @@ void sigint_handler(int sig) {
 int isnum(char c) {
     return c >= '0' && c <= '9';
 }
-static int power(int a, int b) {
-    int res = a;
-    int i;
-    for (i = 1; i < b; ++i) res *= a;
-    return res;
-}
 
 static void delay(unsigned int ms) {
     clock_t start_time = clock();
@@ -33,21 +36,8 @@ static void delay(unsigned int ms) {
 
 }
 
-int stoi(const char *s)  {
-    size_t len = strlen(s);
-    int sum = 0;
-    int i = 1; 
-
-    while (*s != '\0') {
-        if (!isnum(*s)) return -1;
-        sum += (*s++ - '0') * power(10, len - i);
-        i++;
-    } 
-    return sum;
-}
-
 void print_usage() {
-   printf("usage: %s [ -h <int hours> -m <int minutes> -s <int seconds>]\n", __FILE__);
+   printf("usage: timer [ -h <int hours> -m <int minutes> -s <int seconds>]\n");
 }
 
 typedef struct {
@@ -57,6 +47,13 @@ typedef struct {
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigint_handler);
+
+    if (argc == 1) {
+        print_usage();
+        return 1;
+    }
+
+    /* initialize flags */
     flag_t seconds;
     flag_t minutes;
     flag_t hours;
@@ -68,16 +65,14 @@ int main(int argc, char *argv[]) {
     hours.val       = 0;
     hours.enabled   = 0;
 
-    if (argc == 1) {
-        print_usage();
-        return 1;
-    }
 
+    /* check if every flag has a value */
     if ((argc - 1) % 2 == 1) {
         fprintf(stderr, RED"error:"DEFAULT" no valid flags given :(\n");
         return 1;
     }
 
+    /* parse flags */
     int i;
     for (i = 1; i < argc; i += 2) {
         if (!strcmp("-s", argv[i])) {
@@ -91,11 +86,14 @@ int main(int argc, char *argv[]) {
             hours.enabled = 1;
         }
     }
+
+    /* check if flags given are valid */
     if (!(seconds.enabled || minutes.enabled || hours.enabled)) {
         fprintf(stderr, RED"error:"DEFAULT" no valid flags given :(\n");
         return 1;
     }
 
+    /* check if flag inputs are valid */
     if (hours.val < 0) {
         fprintf(stderr, RED"error:"DEFAULT" -h flag input is not an int :(\n");
         return 1;
@@ -128,5 +126,4 @@ int main(int argc, char *argv[]) {
     printf("\r\x1b[K");
     printf("done!\n\a");
     return 0;
-
 }
