@@ -1,3 +1,4 @@
+/* cc timer.c -o timer */
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,20 +9,23 @@
 #define DEFAULT "\x1b[0;39m"
 
 void sigint_handler(int sig) {
-    printf("\n"RED"stopping\n");
-    exit(0);
+    if (sig == SIGINT) {
+        printf("\n"RED"stopping\n");
+        exit(0);
+    }
 }
 
 int isnum(char c) {
     return c >= '0' && c <= '9';
 }
-static inline int power(int a, int b) {
+static int power(int a, int b) {
     int res = a;
-    for (int i = 0; i < b; ++i) res *= a;
+    int i;
+    for (i = 1; i < b; ++i) res *= a;
     return res;
 }
 
-static inline void delay(unsigned int ms) {
+static void delay(unsigned int ms) {
     clock_t start_time = clock();
     clock_t wait_time = ms * (CLOCKS_PER_SEC / 1000);
 
@@ -42,7 +46,7 @@ int stoi(const char *s)  {
     return sum;
 }
 
-void print_usage(int err) {
+void print_usage() {
    printf("usage: %s [ -h <int hours> -m <int minutes> -s <int seconds>]\n", __FILE__);
 }
 
@@ -53,12 +57,19 @@ typedef struct {
 
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigint_handler);
-    flag_t seconds = {0};
-    flag_t minutes = {0};
-    flag_t hours   = {0};
+    flag_t seconds;
+    flag_t minutes;
+    flag_t hours;
+
+    seconds.val     = 0;
+    seconds.enabled = 0;
+    minutes.val     = 0;
+    minutes.enabled = 0;
+    hours.val       = 0;
+    hours.enabled   = 0;
 
     if (argc == 1) {
-        print_usage(1);
+        print_usage();
         return 1;
     }
 
@@ -67,15 +78,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    for (int i = 1; i < argc; i += 2) {
+    int i;
+    for (i = 1; i < argc; i += 2) {
         if (!strcmp("-s", argv[i])) {
-            seconds.val = stoi(argv[i + 1]);
+            seconds.val     = atoi(argv[i + 1]);
             seconds.enabled = 1;
         } else if (!strcmp("-m", argv[i])) {
-            minutes.val = stoi(argv[i + 1]);
+            minutes.val     = atoi(argv[i + 1]);
             minutes.enabled = 1;
         } else if (!strcmp("-h", argv[i])) {
-            hours.val = stoi(argv[i + 1]);
+            hours.val     = atoi(argv[i + 1]);
             hours.enabled = 1;
         }
     }
@@ -95,9 +107,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int start = time(NULL);
-    int now = 0;
-    int old = start;
     int timer;
 
     timer = seconds.enabled * seconds.val 
