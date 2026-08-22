@@ -1,10 +1,11 @@
 
 /*
  * timer.c: simple terminal timer written in ansi c
- *
- * usage: timer [options]
+ * usage: timer [-cS] [options]
  *  
- * options: -s <int seconds>
+ * options: -c countdown 
+ *          -S stopwatch
+ *          -s <int seconds>
  *          -m <int minutes>
  *          -h <int hours>
  *
@@ -59,7 +60,16 @@ static void delay(unsigned int ms) {
 }
 
 void print_usage() {
-   printf("usage: timer [ -h <int hours> -m <int minutes> -s <int seconds>]\n");
+    printf(
+        "timer.c: simple terminal timer written in ansi c\n"
+        "usage: timer [-cS] [options]\n\n"
+         
+        "options: -c countdown\n"
+               "\t-S stopwatch\n"
+               "\t-s <int seconds>\n"
+               "\t-m <int minutes>\n"
+               "\t-h <int hours>\n"
+    );
 }
 
 typedef struct {
@@ -80,6 +90,10 @@ int main(int argc, char *argv[]) {
     flag_t minutes;
     flag_t hours;
 
+    int countdown = 0;
+    int stopwatch = 0;
+    int time_limit = 1;
+
     seconds.val     = 0;
     seconds.enabled = 0;
     minutes.val     = 0;
@@ -89,32 +103,38 @@ int main(int argc, char *argv[]) {
 
 
     /* check if every flag has a value */
+    /*
     if ((argc - 1) % 2 == 1) {
         fprintf(stderr, RED"error:"DEFAULT" no valid flags given :(\n");
         return 1;
-    }
+    } */
 
     /* parse flags */
     int i;
-    for (i = 1; i < argc; i += 2) {
+    for (i = 1; i < argc; i++) {
         if (!strcmp("-s", argv[i])) {
-            seconds.val     = atoi(argv[i + 1]);
+            seconds.val     = atoi(argv[++i]);
             seconds.enabled = 1;
         } else if (!strcmp("-m", argv[i])) {
-            minutes.val     = atoi(argv[i + 1]);
+            minutes.val     = atoi(argv[++i]);
             minutes.enabled = 1;
         } else if (!strcmp("-h", argv[i])) {
-            hours.val     = atoi(argv[i + 1]);
+            hours.val     = atoi(argv[++i]);
             hours.enabled = 1;
+        } else if (!strcmp("-c", argv[i])) {
+            countdown = 1;
+        } else if (!strcmp("-S", argv[i])) {
+            stopwatch = 1;
         }
     }
 
     /* check if flags given are valid */
     if (!(seconds.enabled || minutes.enabled || hours.enabled)) {
-        fprintf(stderr, RED"error:"DEFAULT" no valid flags given :(\n");
-        return 1;
+        time_limit = 0;
     }
 
+    if (!(countdown || stopwatch))
+        countdown = 1;
     /* check if flag inputs are valid */
     if (hours.val < 0) {
         fprintf(stderr, RED"error:"DEFAULT" -h flag input is not an int :(\n");
@@ -127,22 +147,48 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int timer;
+    int timer = seconds.enabled * seconds.val 
+              + minutes.enabled * minutes.val * 60
+              + hours.enabled   *   hours.val * 3600;
+    int current = 0;
 
-    timer = seconds.enabled * seconds.val 
-          + minutes.enabled * minutes.val * 60
-          +   hours.enabled *   hours.val * 3600;
+    if (countdown) {
+        if (!time_limit) {
+            fprintf(stderr, RED"error:"DEFAULT" no time limit given for countdown :(\n");
+            return 1;
+        }
+        while (timer > 0) {
+            long h = timer / 3600;
+            long m = (timer % 3600) / 60;
+            long s = timer % 60;
 
-    while (timer > 0) {
-        long h = timer / 3600;
-        long m = (timer % 3600) / 60;
-        long s = timer % 60;
+            printf("\r%ld:%02ld:%02ld", h, m, s);
+            fflush(stdout);
 
-        printf("\r%ld:%02ld:%02ld", h, m, s);
-        fflush(stdout);
+            timer--;
+            delay(1000);
+        }
+    } else if (stopwatch) {
+        while (1) {
+            long h = timer / 3600;
+            long m = (timer % 3600) / 60;
+            long s = timer % 60;
 
-        timer--;
-        delay(1000);
+            long ch = current / 3600;
+            long cm = (current % 3600) / 60;
+            long cs = current % 60;
+
+            printf("\r%ld:%02ld:%02ld", ch, cm, cs);
+            if (time_limit) {
+                printf("/%ld:%02ld:%02ld", h, m, s);
+                if (current > timer) break;
+            }
+
+            fflush(stdout);
+
+            current++;
+            delay(1000);
+        }
     }
 
     printf("\r\x1b[K");
