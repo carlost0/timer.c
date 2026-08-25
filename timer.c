@@ -62,10 +62,6 @@ void sigint_handler(int sig) {
     }
 }
 
-int isnum(char c) {
-    return c >= '0' && c <= '9';
-}
-
 void print_usage() {
     printf(
         "timer.c: simple terminal timer written in ansi c\n"
