@@ -37,27 +37,23 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#define NGL_INPUT
-#define NGL_INPUT_IMPLEMENTATION
-#define NGL_FONTS
+#define NGL_NO_MATH
 #define NGL_FONTS_IMPLEMENTATION
 #define NGL_IMPLEMENTATION
 #include "ngl.h"
 
-#define RED "\x1b[0;31m"
-#define DEFAULT "\x1b[0;39m"
+#define TRED "\x1b[0;31m"
+#define TDEFAULT "\x1b[0;39m"
 
 #define FPS 60
 
-screen_t screen = {0};
-input_ctx_t input_ctx = {0};
+static ngl_t ngl;
 
 void sigint_handler(int sig) {
     if (sig == SIGINT) {
         clear_screen();
-        destroy_screen(&screen);
-        destroy_input(&input_ctx);
-        printf("\n"RED"stopping\n");
+        ngl_destroy(&ngl);
+        printf("\n"TRED"stopping\n""TDEFAULT");
         exit(0);
     }
 }
@@ -134,13 +130,13 @@ int main(int argc, char *argv[]) {
 
     /* check if flag inputs are valid */
     if (hours.val < 0) {
-        fprintf(stderr, RED"error:"DEFAULT" -h flag input is not an int :(\n");
+        fprintf(stderr, TRED"error:"TDEFAULT" -h flag input is not an int :(\n");
         return 1;
     } if (minutes.val < 0) {
-        fprintf(stderr, RED"error:"DEFAULT" -m flag input is not an int :(\n");
+        fprintf(stderr, TRED"error:"TDEFAULT" -m flag input is not an int :(\n");
         return 1;
     } if (seconds.val < 0) {
-        fprintf(stderr, RED"error:"DEFAULT" -s flag input is not an int :(\n");
+        fprintf(stderr, TRED"error:"TDEFAULT" -s flag input is not an int :(\n");
         return 1;
     }
 
@@ -150,43 +146,35 @@ int main(int argc, char *argv[]) {
     int current = 0;
 
     if (!time_limit && !stopwatch) {
-        fprintf(stderr, RED"error:"DEFAULT" no time limit given for countdown :(\n");
+        fprintf(stderr, TRED"error:"TDEFAULT" no time limit given for countdown :(\n");
         return 1;
     }
 
-    u16 width, height;
-    get_term_size(&height, &width);
+    ngl = ngl_new(0);
 
-    screen.w = width;
-    screen.h = --height;
+    u32 width = ngl.screen.w;
+    u32 height = ngl.screen.h;
 
-    init_screen(&screen);
-    init_input(&input_ctx);
-
-    font_t font = {0};
-    load_glyphs(&font, NULL);
-
-    int input = 0;
     clear_screen();
     if (countdown) {
         u32 len = strlen("00:00:00");
         u64 frame = 0; 
         while (timer > 0) {
-            input = get_input(&input_ctx);
+            get_keyboard_state(&ngl);
             long h = timer / 3600;
             long m = (timer % 3600) / 60;
             long s = timer % 60;
 
-            clear_bg(&screen, ':', (color_t){0});
-            draw_text_fmt(&screen, font, (width / 2) - (len * font.w / 2), (height / 2) - font.h, 'l', (color_t) {255,255,255}, "%02ld:%02ld:%02ld", h, m, s);
-            draw_screen_borders(&screen, 0, (color_t){255,255,255});
-            print_screen(&screen);
+            fill_bg(&ngl, ':', (color_t){0});
+            draw_text_fmt(&ngl, (width / 2) - (len * ngl.font.w / 2), (height / 2) - ngl.font.h, 'l', WHITE, "%02ld:%02ld:%02ld", h, m, s);
+            draw_screen_borders(&ngl, 0, WHITE);
+            print_screen(&ngl);
 
             if (frame % FPS == 0)
                 timer--;
             frame++;
             delay(1000 / FPS);
-            if (input == 'q') break;
+            if (is_key_down(&ngl, KEY_Q)) break;
         }
     } else if (stopwatch) {
         u32 len = strlen("00:00:00") + 1;
@@ -194,10 +182,10 @@ int main(int argc, char *argv[]) {
 
         u64 frame = 0; 
 
-        u32 x = (width / 2) - (cap + font.w / 2);
-        u32 y = (height / 2) - font.h;
-        do {
-            input = get_input(&input_ctx);
+        u32 x = (width / 2) - (cap + ngl.font.w / 2);
+        u32 y = (height / 2) - ngl.font.h;
+        while (1) {
+            get_keyboard_state(&ngl);
             long h = timer / 3600;
             long m = (timer % 3600) / 60;
             long s = timer % 60;
@@ -207,32 +195,32 @@ int main(int argc, char *argv[]) {
             long cs = current % 60;
 
 
-            clear_bg(&screen, ':', (color_t){0});
+            fill_bg(&ngl, ':', BLACK);
 
-            draw_text_fmt(&screen, font, x, y, 'l', (color_t) {255,255,255}, "%02ld:%02ld:%02ld", ch, cm, cs);
+            draw_text_fmt(&ngl, x, y, 'l', (color_t) {255,255,255}, "%02ld:%02ld:%02ld", ch, cm, cs);
             if (time_limit) {
-                draw_text_fmt(&screen, font, x, y + font.hpad + font.h + 2, 'l', (color_t) {255,255,255}, "%02ld:%02ld:%02ld", h, m, s);
-                draw_rect(&screen, x - width / 10, y + font.h + 1, font.h * len + width / 5, 1, '-', (color_t) {255,255,255});
+                draw_text_fmt(&ngl, x, y + ngl.font.hpad + ngl.font.h + 2, 'l', (color_t) {255,255,255}, "%02ld:%02ld:%02ld", h, m, s);
+                draw_rect(&ngl, x - width / 10, y + ngl.font.h + 1, ngl.font.h * len + width / 5, 1, '-', (color_t) {255,255,255});
             }
 
-            draw_screen_borders(&screen, 0, (color_t){255,255,255});
+            draw_screen_borders(&ngl, 0, WHITE);
 
-            print_screen(&screen);
+            print_screen(&ngl);
 
             if (frame % FPS == 0)
                 current++;
 
             if (current * time_limit > timer * time_limit) break;
 
+            if (is_key_down(&ngl, KEY_Q)) break;
             frame++;
             delay(1000 / FPS);
-        } while (input != 'q');
+        }
     }
 
-    destroy_screen(&screen);
-    destroy_input(&input_ctx);
+    ngl_destroy(&ngl);
 
     printf("\r\x1b[K");
-    printf("done!\n\a");
+    printf("done!\n\a"TDEFAULT);
     return 0;
 }
